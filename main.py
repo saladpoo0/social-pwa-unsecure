@@ -4,6 +4,7 @@ import sqlite3
 import subprocess
 from flask import Flask, render_template, request, redirect
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect
 import user_management as db
 
 # ── Auto-bootstrap the database on every startup ──────────────────────────────
@@ -51,6 +52,9 @@ CORS(app)
 
 # VULNERABILITY: Hardcoded secret key — session cookies can be forged
 app.secret_key = "supersecretkey123"
+
+# Enable CSRF protection
+csrf = CSRFProtect(app)
 
 
 # ── Home / Login ──────────────────────────────────────────────────────────────
