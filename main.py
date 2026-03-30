@@ -2,7 +2,7 @@ import os
 import sys
 import sqlite3
 import subprocess
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, session
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 import user_management as db
@@ -76,6 +76,7 @@ def home():
         password = request.form["password"]
         isLoggedIn = db.retrieveUsers(username, password)
         if isLoggedIn:
+            session['username'] = username  # Store username in session
             posts = db.getPosts()
             return render_template("feed.html", username=username, state=isLoggedIn, posts=posts)
         else:
@@ -110,15 +111,18 @@ def feed():
         return redirect(request.args.get("url"), code=302)
 
     if request.method == "POST":
+        # FIX: Get username from session (trusted), not form data (user-controlled)
+        username = session.get('username', None)
+        if not username:
+            return redirect("/", code=302)  # Redirect to login if not authenticated
         post_content = request.form["content"]
-        # VULNERABILITY: IDOR — username from hidden form field, can be tampered with
-        username = request.form.get("username", "Anonymous")
         db.insertPost(username, post_content)
         posts = db.getPosts()
         return render_template("feed.html", username=username, state=True, posts=posts)
     else:
+        username = session.get('username', "Guest")
         posts = db.getPosts()
-        return render_template("feed.html", username="Guest", state=True, posts=posts)
+        return render_template("feed.html", username=username, state=True, posts=posts)
 
 
 # ── User Profile ──────────────────────────────────────────────────────────────
@@ -138,16 +142,20 @@ def profile():
 
 @app.route("/messages", methods=["POST", "GET"])
 def messages():
-    # VULNERABILITY: No authentication — change ?user= to read anyone's inbox
+    # FIX: Check if user is authenticated
+    username = session.get('username', None)
+    if not username:
+        return redirect("/", code=302)  # Redirect to login if not authenticated
+    
     if request.method == "POST":
-        sender    = request.form.get("sender", "Anonymous")
+        # FIX: Get sender from session (trusted), not form data (user-controlled)
         recipient = request.form.get("recipient", "")
         body      = request.form.get("body", "")
-        db.sendMessage(sender, recipient, body)
-        msgs = db.getMessages(recipient)
-        return render_template("messages.html", messages=msgs, username=sender, recipient=recipient)
+        db.sendMessage(username, recipient, body)  # Use session username as sender
+        msgs = db.getMessages(username)  # Only get messages for current user
+        return render_template("messages.html", messages=msgs, username=username, recipient=recipient)
     else:
-        username = request.args.get("user", "Guest")
+        # FIX: Only allow users to view their own inbox (no ?user= parameter exploitation)
         msgs = db.getMessages(username)
         return render_template("messages.html", messages=msgs, username=username, recipient=username)
 
