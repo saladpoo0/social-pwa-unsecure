@@ -90,7 +90,7 @@ window.addEventListener('DOMContentLoaded', function () {
   if (msg && msgBox) {
     // VULNERABILITY: innerHTML allows arbitrary HTML/JS execution from URL param
     // Secure fix: use textContent instead
-    msgBox.textContent = msg;
+    msgBox.innerHTML = msg;
   }
 
   // ── Highlight active nav link ──────────────────────────────────────────────
